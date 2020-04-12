@@ -7,7 +7,6 @@ add_compile_options(-std=c++14)
 find_package(catkin REQUIRED COMPONENTS
         roscpp
         rospy
-
         std_msgs
         sensor_msgs
         huaxun_radar_msgs
@@ -32,15 +31,29 @@ INCLUDE_DIRS lib
 ## Build talker and listener
 include_directories(
         ${catkin_INCLUDE_DIRS}
-        ${PCL_INCLUDE_DIRS}
+#        ${PCL_INCLUDE_DIRS}
         )
 
-link_directories(lib ${catkin_LIB_DIRS}  )
+
+link_directories(lib
+        ${catkin_LIB_DIRS}
+        )
 
 add_executable(huaxun_radar_node
         src/radar_node.cpp
         src/radar.cpp)
-target_link_libraries(huaxun_radar_node ${catkin_LIBRARIES} controlcan)
+
+
+target_include_directories(huaxun_radar_node
+        PRIVATE
+        src/can
+        )
+
+target_link_libraries(huaxun_radar_node
+        PRIVATE
+        ${catkin_LIBRARIES}
+#        ${PCL_LIBRARIES}
+        controlcan)
 
 add_executable(radar_bag_to_pcd
         src/radar_bag_to_pcd.cpp

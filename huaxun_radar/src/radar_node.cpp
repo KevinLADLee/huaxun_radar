@@ -3,15 +3,16 @@
 //
 
 #include "ros/ros.h"
-#include "radar.h"
 #include <iostream>
+
+#include "radar.h"
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "radar_driver_node");
   ros::NodeHandle n;
 
 //  Radar radar_test_parse("test_parse");
-  Radar radar("normal");
+  radar::Radar radar("normal");
 
   while (ros::ok()){
     ros::spinOnce();
