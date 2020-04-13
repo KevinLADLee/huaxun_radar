@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
   ros::NodeHandle n;
 
 //  Radar radar_test_parse("test_parse");
-  radar::Radar radar("normal");
+  radar::Radar radar;
 
   while (ros::ok()){
     ros::spinOnce();
