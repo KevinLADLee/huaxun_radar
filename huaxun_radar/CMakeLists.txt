@@ -22,6 +22,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Boost REQUIRED COMPONENTS system filesystem thread)
 
+find_package(PCL REQUIRED)
+
 ## Declare a catkin package
 catkin_package(
 INCLUDE_DIRS lib
@@ -58,6 +60,18 @@ target_link_libraries(huaxun_radar_node
 add_executable(radar_bag_to_pcd
         src/radar_bag_to_pcd.cpp
         )
+target_include_directories(
+    radar_bag_to_pcd
+    PRIVATE
+    ${PCL_INCLUDE_DIRS}
+)
+
+#link_directories(
+#    radar_bag_to_pcd
+#    PRIVATE
+#    ${PCL_LIBRARY_DIRS}
+#)
+
 target_link_libraries(radar_bag_to_pcd
         ${Boost_LIBRARIES}
         ${catkin_LIBRARIES}

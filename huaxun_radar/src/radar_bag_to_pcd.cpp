@@ -9,14 +9,56 @@
 #include <rosbag/view.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/transforms.h>
+
+#include <pcl/pcl_macros.h>
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/io/pcd_io.h>
+
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
 
+#include <huaxun_radar_msgs/RadarTargetArray.h>
 #include <sensor_msgs/point_cloud_conversion.h>
 
 //typedef sensor_msgs::PointCloud2 PointCloud;
 //typedef PointCloud::Ptr PointCloudPtr;
 //typedef PointCloud::ConstPtr PointCloudConstPtr;
+
+struct PclRadarPointType{
+  PCL_ADD_POINT4D;
+  float vx;
+  float vy;
+  std::uint8_t id;
+  std::uint16_t peak;
+  std::uint8_t car_speed;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+}EIGEN_ALIGN16;
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(PclRadarPointType,
+                            (float, x, x)
+                                 (float, y, y)
+                                 (float, z, z)
+                                 (float, vx, vx)
+                                 (float, vy, vy)
+                                 (std::uint8_t, id, id)
+                                 (std::uint16_t, peak, peak)
+                                 (std::uint8_t, car_speed, car_speed)
+                                 )
+struct PclRadarTrackType{
+  PCL_ADD_POINT4D;
+  float vx;
+  float vy;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+}EIGEN_ALIGN16;
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(PclRadarTrackType,
+                                  (float, x, x)
+                                      (float, y, y)
+                                      (float, z, z)
+                                      (float, vx, vx)
+                                      (float, vy, vy))
+
 
 /* ---[ */
 int main (int argc, char** argv)
@@ -56,7 +98,7 @@ int main (int argc, char** argv)
         topic_list[ci->topic] = ci->datatype;
         if (ci->topic == argv[2])
         {
-            if (ci->datatype == std::string("sensor_msgs/PointCloud"))
+            if (ci->datatype == std::string("huaxun_radar_msgs/RadarTargetArray"))
             {
                 target_topic = std::string (argv[2]);
                 view.addQuery (bag, rosbag::TopicQuery (target_topic));
@@ -95,7 +137,8 @@ int main (int argc, char** argv)
     // Add the PointCloud handler
     std::cerr << "Saving recorded sensor_msgs::PointCloud messages on topic " << target_topic << " to " << output_dir << std::endl;
 
-    sensor_msgs::PointCloud2 cloud_t;
+    sensor_msgs::PointCloud2 points_msg;
+    sensor_msgs::PointCloud2 tracks_msg;
     ros::Duration r (0.001);
     // Loop over the whole bag file
     while (view_it != view.end ())
@@ -111,43 +154,44 @@ int main (int argc, char** argv)
         else
         {
             // Get the PointCloud2 message
-            sensor_msgs::PointCloudConstPtr cloud_origin = view_it->instantiate<sensor_msgs::PointCloud> ();
-            sensor_msgs::PointCloud2 cloud_2;
-            sensor_msgs::convertPointCloudToPointCloud2(*cloud_origin, cloud_2);
-            sensor_msgs::PointCloud2Ptr cloud = boost::make_shared<sensor_msgs::PointCloud2>(cloud_2);
+          huaxun_radar_msgs::RadarTargetArrayConstPtr radar_targets_ptr_ = view_it->instantiate<huaxun_radar_msgs::RadarTargetArray> ();
 
-            if (cloud_origin == NULL)
-            {
-                ++view_it;
-                continue;
-            }
+          if (radar_targets_ptr_ == NULL)
+          {
+            ++view_it;
+            continue;
+          }
 
-            // If a target_frame was specified
-            if(argc > 4)
-            {
-                // Transform it
-                if (!pcl_ros::transformPointCloud (argv[4], *cloud, cloud_t, tf_listener))
-                {
-                    ++view_it;
-                    continue;
-                }
-            }
-            else
-            {
-                // Else, don't transform it
-                cloud_t = *cloud;
-            }
+          pcl::PointCloud<PclRadarPointType> points;
+          auto point_size = radar_targets_ptr_->radar_point_array.size();
+          points.points.resize(point_size);
+          points.width = point_size;
+          points.height = 1;
+          for(unsigned int i = 0; i < point_size; i++){
+            auto &p = radar_targets_ptr_->radar_point_array[i];
+            points.points[i].x = -std::sin(p.target_angle / 180.0 * M_PI) * p.target_distance;
+            points.points[i].y = std::cos(p.target_angle / 180.0 * M_PI) * p.target_distance;
+            points.points[i].z = 0;
+            points.points[i].vx = -std::sin(p.target_angle / 180.0 * M_PI) * p.target_speed;
+            points.points[i].vy = std::cos(std::abs(p.target_angle / 180.0 )* M_PI) * p.target_speed;
+            points.points[i].id = p.target_id;
+            points.points[i].peak = p.target_peak_val;
+          }
 
-            std::cerr << "Got " << cloud_t.width * cloud_t.height << " data points in frame " << cloud_t.header.frame_id << " on topic " << view_it->getTopic() << " with the following fields: " << pcl::getFieldsList (cloud_t) << std::endl;
+          pcl::toROSMsg(points, points_msg);
+          points_msg.header = radar_targets_ptr_->header;
 
-            std::stringstream ss;
-            ss << output_dir << "/" << cloud_t.header.stamp << ".pcd";
-            std::cerr << "Data saved to " << ss.str () << std::endl;
-            pcl::io::savePCDFile (ss.str (), cloud_t, Eigen::Vector4f::Zero (),
-                                  Eigen::Quaternionf::Identity (), true);
+
+          std::cerr << "Got " << points_msg.width * points_msg.height << " data points in frame " << points_msg.header.frame_id << " on topic " << view_it->getTopic() << " with the following fields: " << pcl::getFieldsList (points_msg) << std::endl;
+
+          std::stringstream ss;
+          ss << output_dir << "/radar_points/" << points_msg.header.stamp << ".pcd";
+          std::cerr << "Data saved to " << ss.str () << std::endl;
+          pcl::io::savePCDFile (ss.str (), points_msg, Eigen::Vector4f::Zero (),
+                                Eigen::Quaternionf::Identity (), true);
         }
-        // Increment the iterator
-        ++view_it;
+      // Increment the iterator
+      ++view_it;
     }
 
     return (0);
