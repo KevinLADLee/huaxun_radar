@@ -29,6 +29,7 @@ struct PclRadarPointType{
   PCL_ADD_POINT4D;
   float vx;
   float vy;
+  float vz;
   std::uint8_t id;
   std::uint16_t peak;
   std::uint8_t car_speed;
@@ -41,6 +42,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(PclRadarPointType,
                                  (float, z, z)
                                  (float, vx, vx)
                                  (float, vy, vy)
+                                 (float, vz, vz)
                                  (std::uint8_t, id, id)
                                  (std::uint16_t, peak, peak)
                                  (std::uint8_t, car_speed, car_speed)
@@ -49,6 +51,7 @@ struct PclRadarTrackType{
   PCL_ADD_POINT4D;
   float vx;
   float vy;
+  float vz;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 }EIGEN_ALIGN16;
 
@@ -57,7 +60,8 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(PclRadarTrackType,
                                       (float, y, y)
                                       (float, z, z)
                                       (float, vx, vx)
-                                      (float, vy, vy))
+                                      (float, vy, vy)
+                                      (float, vz, vz))
 
 
 /* ---[ */
@@ -169,26 +173,48 @@ int main (int argc, char** argv)
           points.height = 1;
           for(unsigned int i = 0; i < point_size; i++){
             auto &p = radar_targets_ptr_->radar_point_array[i];
-            points.points[i].x = -std::sin(p.target_angle / 180.0 * M_PI) * p.target_distance;
+            points.points[i].x = std::sin(p.target_angle / 180.0 * M_PI) * p.target_distance;
             points.points[i].y = std::cos(p.target_angle / 180.0 * M_PI) * p.target_distance;
             points.points[i].z = 0;
-            points.points[i].vx = -std::sin(p.target_angle / 180.0 * M_PI) * p.target_speed;
-            points.points[i].vy = std::cos(std::abs(p.target_angle / 180.0 )* M_PI) * p.target_speed;
+            points.points[i].vx = std::sin(p.target_angle / 180.0 * M_PI) * p.target_speed;
+            points.points[i].vy = std::cos(p.target_angle / 180.0 * M_PI) * p.target_speed;
+            points.points[i].vz = 0;
             points.points[i].id = p.target_id;
             points.points[i].peak = p.target_peak_val;
           }
-
           pcl::toROSMsg(points, points_msg);
           points_msg.header = radar_targets_ptr_->header;
-
-
           std::cerr << "Got " << points_msg.width * points_msg.height << " data points in frame " << points_msg.header.frame_id << " on topic " << view_it->getTopic() << " with the following fields: " << pcl::getFieldsList (points_msg) << std::endl;
-
           std::stringstream ss;
           ss << output_dir << "/radar_points/" << points_msg.header.stamp << ".pcd";
           std::cerr << "Data saved to " << ss.str () << std::endl;
           pcl::io::savePCDFile (ss.str (), points_msg, Eigen::Vector4f::Zero (),
                                 Eigen::Quaternionf::Identity (), true);
+
+
+          pcl::PointCloud<PclRadarTrackType> tracks;
+          auto track_size = radar_targets_ptr_->radar_track_array.size();
+          tracks.resize(track_size);
+          tracks.width = track_size;
+          tracks.height = 1;
+          for(unsigned int i = 0; i < track_size; i++){
+            auto &t = radar_targets_ptr_->radar_track_array[i];
+            tracks.points[i].x = t.x_distance;
+            tracks.points[i].y = t.y_distance;
+            tracks.points[i].z = 0;
+            tracks.points[i].vx = t.x_velocity;
+            tracks.points[i].vy = t.y_velocity;
+            tracks.points[i].vz = 0;
+          }
+          pcl::toROSMsg(tracks, tracks_msg);
+          tracks_msg.header = radar_targets_ptr_->header;
+          std::cerr << "Got " << tracks_msg.width * tracks_msg.height << " data tracks in frame " << tracks_msg.header.frame_id << " on topic " << view_it->getTopic() << " with the following fields: " << pcl::getFieldsList (tracks_msg) << std::endl;
+          std::stringstream ss_t;
+          ss_t << output_dir << "/radar_tracks/" << tracks_msg.header.stamp << ".pcd";
+          std::cerr << "Data saved to " << ss_t.str () << std::endl;
+          pcl::io::savePCDFile (ss_t.str (), tracks_msg, Eigen::Vector4f::Zero (),
+                                Eigen::Quaternionf::Identity (), true);
+
         }
       // Increment the iterator
       ++view_it;
