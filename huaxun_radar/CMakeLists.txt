@@ -51,6 +51,11 @@ target_include_directories(huaxun_radar_node
         src/can
         )
 
+add_dependencies(
+    huaxun_radar_node
+    huaxun_radar_msgs_generate_messages
+)
+
 target_link_libraries(huaxun_radar_node
         PRIVATE
         ${catkin_LIBRARIES}
@@ -60,6 +65,9 @@ target_link_libraries(huaxun_radar_node
 add_executable(radar_bag_to_pcd
         src/radar_bag_to_pcd.cpp
         )
+
+
+
 target_include_directories(
     radar_bag_to_pcd
     PRIVATE
