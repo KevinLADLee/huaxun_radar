@@ -15,11 +15,22 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/transforms.h>
 
+#include <canlib.h>
+
 #include <huaxun_radar_msgs/RadarTargetArray.h>
 
 #include <sensor_msgs/PointCloud2.h>
 
 namespace radar{
+
+
+struct CanMsg{
+  long id = 0;
+  unsigned char msg[8];
+  unsigned int dlc = 0;
+  unsigned int flag = 0;
+  unsigned long time = 0;
+};
 
 class Radar {
 
@@ -30,8 +41,6 @@ class Radar {
 
   Radar();
 
-  explicit Radar(char* test);
-
   bool TestParse();
 
   ~Radar();
@@ -39,7 +48,10 @@ class Radar {
  private:
   void Init();
 
-  bool InitCan();
+
+  int CanInit();
+
+  int CanRead();
 
   void ReceiveThread();
 
@@ -67,9 +79,10 @@ class Radar {
   ros::Publisher pointcloud_pub_;
   ros::Publisher pointcloud_raw_pub_;
 
-//        VCI_BOARD_INFO pInfo1 [50]; // All usb-can devices info
-//        VCI_CAN_OBJ rec_buffer_[3000];
-//        VCI_INIT_CONFIG config_;
+  canHandle can_handle_;
+  canStatus can_status_;
+  int channel_ = 0;
+
 
   int count=0; //数据列表中，用来存储列表序号。
 

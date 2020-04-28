@@ -3,7 +3,6 @@
 //
 
 #include "radar.h"
-#include "controlcan.h"
 
 namespace radar{
 
@@ -11,21 +10,11 @@ Radar::Radar() {
   Init();
 }
 
-Radar::Radar(char* test) {
-    TestParse();
-}
-
 Radar::~Radar() {
   receive_thread_ptr_->join();
-  std::cout << "Stop receiving thread success!" << std::endl;
-  std::cout << "Closing USB-CAN device!" << std::endl;
-  usleep(100000); // delay100ms
-  VCI_ResetCAN(VCI_USBCAN2, 0, 0); //Reset CAN1
-  usleep(100000); // delay100ms
-  VCI_ResetCAN(VCI_USBCAN2, 0, 1); //Reset CAN2
-  usleep(100000); // delay100ms
-  VCI_CloseDevice(VCI_USBCAN2,0) ;// Close Device
-  std::cout << "Close USB-CAN device success!" << std::endl;
+  canBusOff(can_handle_);
+  canClose(can_handle_);
+  canUnloadLibrary();
 }
 
 void Radar::Init() {
@@ -45,56 +34,24 @@ void Radar::Init() {
 
 }
 
-bool Radar::InitCan() {
-  VCI_BOARD_INFO pInfo1 [50];
-  unsigned int num = VCI_FindUsbDevice2(pInfo1);
-  std::cout << ">>Find " << num << " USB-CAN devices" << std::endl;
-
-  if(VCI_OpenDevice(VCI_USBCAN2,0,0)==1)//Open Device
-  {
-    std::cout << ">>Open deivce success!" << std::endl;
-  }else
-  {
-    std::cerr << ">>Open deivce error!" << std::endl;
-    return false;
-//    exit(1);
-    //TODO: Safe exit
+int Radar::CanInit() {
+  std::cout << "Reading messages on channel " << channel_ << std::endl;
+  canInitializeLibrary();
+  can_handle_ = canOpenChannel(channel_, canOPEN_EXCLUSIVE);
+  if(can_handle_ < 0){
+    std::cerr << "canOpenChannel: " << channel_ << std::endl;
+//    check("", can_handle);
+  }
+  can_status_ = canSetBusParams(can_handle_, canBITRATE_500K, 0, 0, 0, 0, 0);
+  if (can_status_ != canOK) {
+    std::cerr << "CanInit: canSetBusParams failed!" << std::endl;
+    return -1;
   }
 
-  //TODO: rosparam support
-  VCI_INIT_CONFIG config;
-  config.AccCode=0;
-  config.AccMask=0xFFFFFFFF;
-  config.Filter=1;// Receive All frames
-  config.Timing0=0x00;  // 500 kbps
-  config.Timing1=0x1C;
-  config.Mode=0;// Normal mode
-
-  if(VCI_InitCAN(VCI_USBCAN2,0,0,&config)!=1)
-  {
-    std::cerr << ">>Init CAN1 error"<< std::endl;
-    VCI_CloseDevice(VCI_USBCAN2,0);
-    return false;
-  }
-
-  if(VCI_StartCAN(VCI_USBCAN2,0,0)!=1)
-  {
-    std::cerr << ">>Start CAN1 error" << std::endl;
-    VCI_CloseDevice(VCI_USBCAN2,0);
-    return false;
-  }
-
-  if(VCI_InitCAN(VCI_USBCAN2,0,1,&config)!=1)
-  {
-    std::cerr << ">>Init can2 error" << std::endl;
-    VCI_CloseDevice(VCI_USBCAN2,0);
-    return false;
-  }
-  if(VCI_StartCAN(VCI_USBCAN2,0,1)!=1)
-  {
-    std::cerr << ">>Start can2 error" << std::endl;
-    VCI_CloseDevice(VCI_USBCAN2,0);
-    return false;
+  can_status_ = canBusOn(can_handle_);
+  if (can_status_ != canOK) {
+    std::cerr << "CanInit: canBusOn failed!" << std::endl;
+    return -1;
   }
 }
 
@@ -106,54 +63,52 @@ void Radar::ReceiveThread() {
   bool first_head = false;
   bool tail = false;
 
-  VCI_CAN_OBJ rec_buffer[3000];
+  auto can_msg_ptr = std::make_shared<CanMsg>();
 
   while(!ros::isShuttingDown())
   {
-    if((reclen = VCI_Receive(VCI_USBCAN2,0,ind,rec_buffer,3000,100))>0)//调用接收函数，如果有数据，进行数据处理显示。
+
+    can_status_ = canReadWait(can_handle_, &can_msg_ptr->id, &can_msg_ptr->msg, &can_msg_ptr->dlc, &fcan_msg_ptr->lag, &can_msg_ptr->time, 120);
+
+    if(can_status_ == canOK)
     {
-
       auto current_rec_time = ros::Time::now();
-
-      for(j=0; j<reclen; j++)
-      {
         if(print_frame) {
-          PrintFrameInfo(ind, rec_buffer[j].ID, rec_buffer[j].DataLen,rec_buffer[j].Data);
+          PrintFrameInfo(channel_, can_msg_ptr->id, can_msg_ptr->dlc, can_msg_ptr->msg);
         }
 
-        switch (rec_buffer[j].ID){
-          case 0x70A:
-            head = true;
-            first_head = true;
-            radar_target_array_msg_ = std::make_shared<TargetArrayMsg>();
-            radar_target_array_msg_->header.stamp = current_rec_time;
-            break;
-          case 0x70C:
-            if(head && first_head) {
-              auto point_msg = ParsePointFrame(rec_buffer[j].Data);
-              radar_target_array_msg_->radar_point_array.push_back(point_msg);
-            }
-            break;
-          case 0x70E:
-            if(head && first_head) {
-              auto track_msg = ParseTrackFrame(rec_buffer[j].Data);
-              radar_target_array_msg_->radar_track_array.push_back(ParseTrackFrame(rec_buffer[j].Data));
-            }
-            break;
-          case 0x70F:
-            tail = true;
-            head = false;
-            PublishMsg();
-            //reset
-            last_radar_target_array_msg_ = radar_target_array_msg_;
-            radar_target_array_msg_.reset();
-            break;
-        };
-      }
+      switch (can_msg_ptr->id){
+        case 0x70A:
+          head = true;
+          first_head = true;
+          radar_target_array_msg_ = std::make_shared<TargetArrayMsg>();
+          radar_target_array_msg_->header.stamp = current_rec_time;
+          break;
+        case 0x70C:
+          if(head && first_head) {
+            auto point_msg = ParsePointFrame(can_msg_ptr->msg);
+            radar_target_array_msg_->radar_point_array.push_back(point_msg);
+          }
+          break;
+        case 0x70E:
+          if(head && first_head) {
+            auto track_msg = ParseTrackFrame(can_msg_ptr->msg);
+            radar_target_array_msg_->radar_track_array.push_back(ParseTrackFrame(can_msg_ptr->msg));
+          }
+          break;
+        case 0x70F:
+          tail = true;
+          head = false;
+          PublishMsg();
+          //reset
+          last_radar_target_array_msg_ = radar_target_array_msg_;
+          radar_target_array_msg_.reset();
+          break;
+      };
+
     }
-    ind=!ind; // Switch CAN1 / CAN2
     using namespace std::chrono_literals;
-    std::this_thread::sleep_for(30ms);
+    std::this_thread::sleep_for(60ms);
   }
 }
 

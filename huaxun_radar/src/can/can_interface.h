@@ -1,0 +1,12 @@
+//
+// Created by kevinlad on 2020/4/27.
+//
+
+#ifndef SRC_HUAXUN_RADAR_HUAXUN_RADAR_SRC_CAN_CAN_INTERFACE_H_
+#define SRC_HUAXUN_RADAR_HUAXUN_RADAR_SRC_CAN_CAN_INTERFACE_H_
+
+class can_interface {
+
+};
+
+#endif //SRC_HUAXUN_RADAR_HUAXUN_RADAR_SRC_CAN_CAN_INTERFACE_H_

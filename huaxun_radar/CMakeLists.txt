@@ -26,8 +26,7 @@ find_package(PCL REQUIRED)
 
 ## Declare a catkin package
 catkin_package(
-INCLUDE_DIRS lib
-
+INCLUDE_DIRS
 )
 
 ## Build talker and listener
@@ -50,6 +49,11 @@ target_include_directories(huaxun_radar_node
         PRIVATE
         src/can
         )
+
+add_library(can_interface
+    src/can/can_interface.cpp
+    src/can/canprocess.cpp
+    )
 
 add_dependencies(
     huaxun_radar_node
