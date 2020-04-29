@@ -7,6 +7,9 @@
 namespace radar{
 
 Radar::Radar() {
+
+  radar_frame_ = "radar";
+
   Init();
 }
 
@@ -24,7 +27,7 @@ void Radar::Init() {
   pointcloud_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/radar_pointcloud", 1);
   pointcloud_raw_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/radar_pointcloud_raw", 1);
 
-  if(!InitCan()){
+  if(CanInit() != 0){
     std::cerr << "USB-CAN Init failed!" << std::endl;
     return;
   }
@@ -37,11 +40,14 @@ void Radar::Init() {
 int Radar::CanInit() {
   std::cout << "Reading messages on channel " << channel_ << std::endl;
   canInitializeLibrary();
-  can_handle_ = canOpenChannel(channel_, canOPEN_EXCLUSIVE);
+  can_handle_ = canOpenChannel(channel_, canOPEN_EXCLUSIVE | canOPEN_REQUIRE_EXTENDED | canOPEN_ACCEPT_VIRTUAL);
   if(can_handle_ < 0){
     std::cerr << "canOpenChannel: " << channel_ << std::endl;
 //    check("", can_handle);
   }
+
+//  stat = canSetNotify(can_handle_, notifyCallback, canNOTIFY_RX | canNOTIFY_TX | canNOTIFY_ERROR | canNOTIFY_STATUS | canNOTIFY_ENVVAR, (char*)0);
+
   can_status_ = canSetBusParams(can_handle_, canBITRATE_500K, 0, 0, 0, 0, 0);
   if (can_status_ != canOK) {
     std::cerr << "CanInit: canSetBusParams failed!" << std::endl;
@@ -53,6 +59,7 @@ int Radar::CanInit() {
     std::cerr << "CanInit: canBusOn failed!" << std::endl;
     return -1;
   }
+  return 0;
 }
 
 void Radar::ReceiveThread() {
@@ -68,14 +75,14 @@ void Radar::ReceiveThread() {
   while(!ros::isShuttingDown())
   {
 
-    can_status_ = canReadWait(can_handle_, &can_msg_ptr->id, &can_msg_ptr->msg, &can_msg_ptr->dlc, &fcan_msg_ptr->lag, &can_msg_ptr->time, 120);
+    can_status_ = canReadWait(can_handle_, &can_msg_ptr->id, &can_msg_ptr->msg, &can_msg_ptr->dlc, &can_msg_ptr->flag, &can_msg_ptr->time, 60);
 
     if(can_status_ == canOK)
     {
       auto current_rec_time = ros::Time::now();
-        if(print_frame) {
-          PrintFrameInfo(channel_, can_msg_ptr->id, can_msg_ptr->dlc, can_msg_ptr->msg);
-        }
+      if(print_frame) {
+        PrintFrameInfo(channel_, can_msg_ptr->id, can_msg_ptr->dlc, can_msg_ptr->msg);
+      }
 
       switch (can_msg_ptr->id){
         case 0x70A:
@@ -98,17 +105,19 @@ void Radar::ReceiveThread() {
           break;
         case 0x70F:
           tail = true;
-          head = false;
-          PublishMsg();
-          //reset
-          last_radar_target_array_msg_ = radar_target_array_msg_;
-          radar_target_array_msg_.reset();
+          if(head && first_head) {
+            head = false;
+            PublishMsg();
+            //reset
+            last_radar_target_array_msg_ = radar_target_array_msg_;
+            radar_target_array_msg_.reset();
+          }
           break;
       };
 
     }
     using namespace std::chrono_literals;
-    std::this_thread::sleep_for(60ms);
+    std::this_thread::sleep_for(10ms);
   }
 }
 
@@ -158,12 +167,14 @@ void Radar::PrintFrameInfo(int can_index, unsigned int can_frame_id, int data_le
 }
 
 void Radar::PublishMsg() {
+  if(radar_target_array_msg_ == nullptr){
+    std::cerr << "Error: radar_target_array_msg_ is null." << std::endl;
+    return;
+  }
   radar_pub_.publish(*radar_target_array_msg_);
   auto msg_timestamp = radar_target_array_msg_->header.stamp;
 
   sensor_msgs::PointCloud2 pointcloud_raw_msg;
-  pointcloud_raw_msg.header.stamp = msg_timestamp;
-  pointcloud_raw_msg.header.frame_id = radar_frame_;
   pcl::PointCloud<pcl::PointXYZ> cloud_raw;
   cloud_raw.width = radar_target_array_msg_->radar_point_array.size();
   cloud_raw.height = 1;
@@ -176,11 +187,11 @@ void Radar::PublishMsg() {
     cloud_raw.points[m].z = 0;
   }
   pcl::toROSMsg(cloud_raw, pointcloud_raw_msg);
+  pointcloud_raw_msg.header.stamp = msg_timestamp;
+  pointcloud_raw_msg.header.frame_id = radar_frame_;
   pointcloud_raw_pub_.publish(pointcloud_raw_msg);
 
   sensor_msgs::PointCloud2 pointcloud_msg;
-  pointcloud_msg.header.stamp = msg_timestamp;
-  pointcloud_msg.header.frame_id = radar_frame_;
   pcl::PointCloud<pcl::PointXYZ> cloud;
   cloud.width = radar_target_array_msg_->radar_track_array.size();
   cloud.height = 1;
@@ -193,6 +204,8 @@ void Radar::PublishMsg() {
     cloud.points[m].z = 0;
   }
   pcl::toROSMsg(cloud, pointcloud_msg);
+  pointcloud_msg.header.stamp = msg_timestamp;
+  pointcloud_msg.header.frame_id = radar_frame_;
   pointcloud_pub_.publish(pointcloud_msg);
 
 

@@ -64,7 +64,8 @@ target_link_libraries(huaxun_radar_node
         PRIVATE
         ${catkin_LIBRARIES}
 #        ${PCL_LIBRARIES}
-        controlcan)
+        canlib
+       )
 
 add_executable(radar_bag_to_pcd
         src/radar_bag_to_pcd.cpp
