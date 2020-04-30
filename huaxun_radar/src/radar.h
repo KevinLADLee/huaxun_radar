@@ -18,6 +18,8 @@
 #include <canlib.h>
 
 #include <huaxun_radar_msgs/RadarTargetArray.h>
+#include "protocol.h"
+
 
 #include <sensor_msgs/PointCloud2.h>
 
@@ -41,8 +43,6 @@ class Radar {
 
   Radar();
 
-  bool TestParse();
-
   ~Radar();
 
  private:
@@ -51,13 +51,8 @@ class Radar {
 
   int CanInit();
 
-  int CanRead();
 
   void ReceiveThread();
-
-  PointMsg ParsePointFrame(const unsigned char *data);
-
-  TrackMsg ParseTrackFrame(const unsigned char *data);
 
   void PrintFrameInfo(int can_index, unsigned int can_frame_id,int data_len, const unsigned char *data);
 
@@ -75,9 +70,8 @@ class Radar {
   bool print_frame = true;
 
   ros::NodeHandle nh_;
-  ros::Publisher radar_pub_;
-  ros::Publisher pointcloud_pub_;
-  ros::Publisher pointcloud_raw_pub_;
+  ros::Publisher radar_tracks_pub_;
+  ros::Publisher radar_points_pub_;
 
   canHandle can_handle_;
   canStatus can_status_;
@@ -86,10 +80,10 @@ class Radar {
 
   int count=0; //数据列表中，用来存储列表序号。
 
-//        unsigned int num_ = 0; //account of USB-CAN Devices
+  ros::Time timestamp_;
+  RadarPointMsgVec radar_point_msg_vec_;
+  RadarTrackMsgVec radar_track_msg_vec_;
 
-  std::shared_ptr<TargetArrayMsg> last_radar_target_array_msg_;
-  std::shared_ptr<TargetArrayMsg> radar_target_array_msg_;
 
 
 };

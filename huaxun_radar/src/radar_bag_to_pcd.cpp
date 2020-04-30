@@ -3,6 +3,7 @@
 //
 
 #include "radar_bag_to_pcd.h"
+#include "protocol.h"
 
 #include <boost/filesystem.hpp>
 #include <rosbag/bag.h>
@@ -222,3 +223,4 @@ int main (int argc, char** argv)
 
     return (0);
 }
+
