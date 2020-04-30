@@ -50,11 +50,6 @@ target_include_directories(huaxun_radar_node
         src/can
         )
 
-add_library(can_interface
-    src/can/can_interface.cpp
-    src/can/canprocess.cpp
-    )
-
 add_dependencies(
     huaxun_radar_node
     huaxun_radar_msgs_generate_messages
@@ -67,17 +62,17 @@ target_link_libraries(huaxun_radar_node
         canlib
        )
 
-add_executable(radar_bag_to_pcd
-        src/radar_bag_to_pcd.cpp
-        )
-
-
-
-target_include_directories(
-    radar_bag_to_pcd
-    PRIVATE
-    ${PCL_INCLUDE_DIRS}
-)
+#add_executable(radar_bag_to_pcd
+#        src/radar_bag_to_pcd.cpp
+#        )
+#
+#
+#
+#target_include_directories(
+#    radar_bag_to_pcd
+#    PRIVATE
+#    ${PCL_INCLUDE_DIRS}
+#)
 
 #link_directories(
 #    radar_bag_to_pcd
@@ -85,8 +80,8 @@ target_include_directories(
 #    ${PCL_LIBRARY_DIRS}
 #)
 
-target_link_libraries(radar_bag_to_pcd
-        ${Boost_LIBRARIES}
-        ${catkin_LIBRARIES}
-        ${PCL_LIBRARIES}
-        )
+#target_link_libraries(radar_bag_to_pcd
+#        ${Boost_LIBRARIES}
+#        ${catkin_LIBRARIES}
+#        ${PCL_LIBRARIES}
+#        )

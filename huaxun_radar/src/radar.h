@@ -23,8 +23,15 @@
 
 #include <sensor_msgs/PointCloud2.h>
 
+#include <chrono>
+
+
 namespace radar{
 
+#define TIMER_START auto start = std::chrono::high_resolution_clock::now();
+#define TIMER_STOP  auto stop = std::chrono::high_resolution_clock::now(); \
+                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); \
+                    std::cout << "Time taken : " << duration.count() << " microseconds" << std::endl;
 
 struct CanMsg{
   long id = 0;
@@ -67,7 +74,7 @@ class Radar {
   std::string radar_pointcloud_raw_topic_ = "/radar_pointcloud_raw";
   std::string radar_pointcloud_topic_ = "/radar_pointcloud";
 
-  bool print_frame = true;
+  bool print_frame = false;
 
   ros::NodeHandle nh_;
   ros::Publisher radar_tracks_pub_;

@@ -67,11 +67,11 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(PclRadarTrackType,
 
 inline RadarPointMsg CanMsgToRadarPointMsg(const unsigned char *data) {
   auto point_msg = RadarPointMsg();
-  point_msg.id       = (uint8_t)(data[0]);
+  point_msg.id   = (uint8_t)(data[0]);
   point_msg.peak = (uint16_t)(data[1] + ((data[2] & 0x1f) << 8));
-  point_msg.car_speed       = (uint8_t)data[4];
+  point_msg.car_speed = (uint8_t)data[4];
 
-  auto raw_target_distance  = (float)((data[2] >> 5) + (data[3] << 3));
+  auto raw_target_distance = (float)((data[2] >> 5) + (data[3] << 3));
   float target_distance = raw_target_distance / 10.0f;
 
   auto raw_target_angle     = (float)(data[5] + ((data[6] & 0x0f) << 8));
@@ -105,6 +105,9 @@ inline RadarTrackMsg CanMsgToRadarTrackMsg(const unsigned char *data) {
 inline void RadarPointMsgVecToPcl(const RadarPointMsgVec &radar_point_vec, pcl::PointCloud<PclRadarPointType> points){
   auto point_size = radar_point_vec.size();
   points.points.resize(point_size);
+
+  std::cout << "point size:" << point_size << std::endl;
+
   points.width = point_size;
   points.height = 1;
   for(unsigned int i = 0; i < point_size; i++){
@@ -122,6 +125,9 @@ inline void RadarPointMsgVecToPcl(const RadarPointMsgVec &radar_point_vec, pcl::
 
 inline void RadarTrackMsgVecToPcl(const RadarTrackMsgVec &radar_track_vec, pcl::PointCloud<PclRadarTrackType> &tracks){
   auto track_size = radar_track_vec.size();
+
+  std::cout << "track size: " << track_size << std::endl;
+
   tracks.resize(track_size);
   tracks.width = track_size;
   tracks.height = 1;

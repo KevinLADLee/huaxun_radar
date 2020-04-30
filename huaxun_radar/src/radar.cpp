@@ -26,8 +26,8 @@ Radar::~Radar() {
 void Radar::Init() {
 
   // ROS Initialization
-  radar_tracks_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/radar_points", 1);
-  radar_points_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/radar_tracks", 1);
+  radar_points_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/radar_points", 1);
+  radar_tracks_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/radar_tracks", 1);
 
   if(CanInit() != 0){
     std::cerr << "CAN Init failed!" << std::endl;
@@ -66,6 +66,8 @@ int Radar::CanInit() {
     std::cerr << "canAccept set code failed!" << std::endl;
     return -1;
   }
+
+
   can_status_ = canBusOn(can_handle_);
   if (can_status_ != canOK) {
     std::cerr << "CanInit: canBusOn failed!" << std::endl;
@@ -87,7 +89,7 @@ void Radar::ReceiveThread() {
   while(!ros::isShuttingDown())
   {
 
-    can_status_ = canReadWait(can_handle_, &can_msg_ptr->id, &can_msg_ptr->msg, &can_msg_ptr->dlc, &can_msg_ptr->flag, &can_msg_ptr->time, 60);
+    can_status_ = canReadWait(can_handle_, &can_msg_ptr->id, &can_msg_ptr->msg, &can_msg_ptr->dlc, &can_msg_ptr->flag, &can_msg_ptr->time, 30);
 
     if(can_status_ == canOK)
     {
@@ -114,6 +116,7 @@ void Radar::ReceiveThread() {
           break;
         case 0x70F:
           tail = true;
+          auto duration = ros::Time::now() - timestamp_;
           if(head && first_head) {
             head = false;
             PublishMsg();
@@ -126,7 +129,7 @@ void Radar::ReceiveThread() {
 
     }
     using namespace std::chrono_literals;
-    std::this_thread::sleep_for(10ms);
+    std::this_thread::sleep_for(30ms);
   }
 }
 
