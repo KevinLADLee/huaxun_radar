@@ -34,7 +34,7 @@ class Radar {
 
   int CanInit();
 
-  int CanOff();
+  int CanOff() const;
 
   void ReceiveThread();
 

@@ -62,10 +62,11 @@ int Radar::CanInit() {
   return 0;
 }
 
-int Radar::CanOff() {
+int Radar::CanOff() const {
   canBusOff(can_handle_);
   canClose(can_handle_);
   canUnloadLibrary();
+  std::cout << "CanOff: Success!" << std::endl;
   return 0;
 }
 
