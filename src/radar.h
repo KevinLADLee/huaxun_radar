@@ -1,37 +1,21 @@
-//
-// Created by kevinlad on 2020/4/8.
-//
-
 #ifndef SRC_RADAR_H
 #define SRC_RADAR_H
-
-
 
 #include <thread>
 #include <memory>
 #include <chrono>
 
 #include <ros/ros.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/transforms.h>
 
+// Kvaser CANLIB
 #include <canlib.h>
 
-#include <huaxun_radar_msgs/RadarTargetArray.h>
 #include "protocol.h"
 
-
-#include <sensor_msgs/PointCloud2.h>
-
-#include <chrono>
-
-
 namespace radar{
-
-#define TIMER_START auto start = std::chrono::high_resolution_clock::now();
-#define TIMER_STOP  auto stop = std::chrono::high_resolution_clock::now(); \
-                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); \
-                    std::cout << "Time taken : " << duration.count() << " microseconds" << std::endl;
 
 struct CanMsg{
   long id = 0;
@@ -42,22 +26,15 @@ struct CanMsg{
 };
 
 class Radar {
-
-  using PointMsg = huaxun_radar_msgs::RadarPoint;
-  using TrackMsg = huaxun_radar_msgs::RadarTrack;
-  using TargetArrayMsg = huaxun_radar_msgs::RadarTargetArray;
  public:
 
   Radar();
 
-  ~Radar();
-
  private:
-  void Init();
-
 
   int CanInit();
 
+  int CanOff();
 
   void ReceiveThread();
 
@@ -84,12 +61,9 @@ class Radar {
   canStatus can_status_;
   int channel_ = 0;
 
-
-  int count=0; //数据列表中，用来存储列表序号。
-
   ros::Time timestamp_;
-  RadarPointMsgVec radar_point_msg_vec_;
-  RadarTrackMsgVec radar_track_msg_vec_;
+  pcl::PointCloud<PclRadarPointType> pcl_radar_points_;
+  pcl::PointCloud<PclRadarTrackType> pcl_radar_tracks_;
 
 
 
